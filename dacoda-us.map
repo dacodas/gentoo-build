@@ -1,0 +1,9 @@
+include "us.map"
+
+# keycode 29 = Decr_Console
+
+keycode 56 = Control
+keycode 125 = Alt
+keycode 100 = Control
+keycode 97 = Alt
+

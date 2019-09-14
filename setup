@@ -1,0 +1,206 @@
+#!/bin/bash
+
+# For some reason, just enabling ssh and portforwarding via the
+# following options doesn't work: 
+# 
+# -device e1000,netdev=net0 -netdev user,id=net0,hostfwd=tcp::5555-:22
+
+# On the other hand, port forwarding from the guest works just fine,
+# so if you'd like to ssh in, do the following in a virtual terminal:
+# 
+# passwd
+# /etc/init.d/sshd start
+# ssh -R 12345:localhost:22 dacoda@10.0.2.2
+
+# TODO: Add flag for --binpkg-respect-use=n and --binpkg-changed-deps=n
+# TODO: Add option for copying over portage-${DATE}.tar.xz file instead of sync?
+# TODO: Add option for emerge-webrsync --revert
+# TODO: Make sure that CONFIG_VIRTIO_BLK and CONFIG_VIRTIO_PCI work
+# TODO: Easier tagging of kernel versions, look into maintaining package and overlay
+# TODO: Use overlayfs for any changes to the filesystem after the image is built
+# TODO: grub-mkconfig, select the correct root partitions
+
+# TODO: add keymaps, .fbtermrc for better console
+# TODO: set MAC address for network interface so I don't get booted
+#       from the network
+
+# TODO: dpi, xmodmap, and redshift, keynav
+# TODO: sudo, add user, `eselect opengl nvidia`
+
+# I don't understand why I had to oneshot mesa in order for the deep
+# emerge to work. The next time around, we'll update the same day we
+# build the package and see how that works.
+
+set -xe
+
+export EMERGE_ARGS="--verbose --tree --getbinpkg --usepkg"
+export EMERGE="emerge $EMERGE_ARGS"
+
+function post_chroot()
+{
+    set -e
+     
+    source /etc/profile
+    export PS1="(chroot) ${PS1}"
+
+    # Change this to using git
+    emerge-webrsync --revert=20190912
+
+    eselect profile list
+
+    echo "Which profile to use?"
+    read PROFILE ; eselect profile set $PROFILE
+
+    # These use flags are being added because the upstream binaries depend
+    # on them. The packages aren't installed if the use flags don't match,
+    # though there is a --respect-use option that can be used to disable
+    # this behavior. Let's think about this more and figure out the best
+    # way to do it...
+
+    cat <<EOF > /etc/portage/package.use/initial-seed
+=sys-apps/util-linux-2.33.2 static-libs
+=sys-libs/zlib-1.2.11-r2 abi_x86_32 minizip
+=x11-libs/libX11-1.6.8 abi_x86_32
+=x11-libs/libxcb-1.13.1 abi_x86_32
+=dev-libs/libpthread-stubs-0.4-r1 abi_x86_32
+=x11-libs/libXau-1.0.9 abi_x86_32
+=x11-libs/libXdmcp-1.1.3 abi_x86_32
+=x11-libs/libXext-1.3.4 abi_x86_32
+=virtual/pkgconfig-1 abi_x86_32
+=dev-util/pkgconf-1.6.3 abi_x86_32
+=dev-libs/lzo-2.10 static-libs
+=x11-libs/libdrm-2.4.97 libkms video_cards_amdgpu video_cards_intel video_cards_nouveau video_cards_radeon
+=x11-base/xcb-proto-1.13 abi_x86_32
+# =media-libs/mesa-19.0.8 lm-sensors lm_sensors
+EOF
+
+    $EMERGE --update --deep --newuse @world
+
+
+    echo "America/Los_Angeles" > /etc/timezone
+    emerge --config sys-libs/timezone-data
+
+    cat << EOF >> /etc/locale.gen
+ja_JP.UTF-8 UTF-8
+en_US.UTF-8 UTF-8
+EOF
+
+    locale-gen
+    eselect locale list
+
+    echo "Select which locale to use" 
+    read LOCALE ; eselect locale set $LOCALE
+
+    env-update
+    . /etc/profile
+    export PS1="(chroot) ${PS1}"
+
+    $EMERGE sys-kernel/gentoo-sources
+
+    cd /usr/src/linux
+
+    echo "Copy over kernel config to /usr/src/linux/.config"
+    echo "Press enter when done"
+    read
+
+    make 
+    make install
+    make modules_install
+
+    # TODO: Figure this out
+    emerge --autounmask-write sys-kernel/linux-firmware
+    yes u | dispatch-conf
+    $EMERGE sys-kernel/genkernel 
+    genkernel --install initramfs
+
+    # make /etc/fstab
+    echo 'hostname="dacoda-gentoo" > /etc/conf.d/hostname'
+
+    $EMERGE --noreplace net-misc/netifrc
+
+    echo "Set the root password for the device"
+    passwd
+
+    $EMERGE sysklogd logrotate mlocate e2fsprogs dhcpcd wpa_supplicant grub:2
+    rc-update add sysklogd default
+    grub-install /dev/vda
+    grub-mkconfig -o /boot/grub/grub.cfg
+
+    exit 
+}
+
+export -f post_chroot
+
+cat <<EOF | fdisk /dev/vda
+n
+p
+1
+2048
++2M
+n
+p
+2
+
++128M
+n
+p
+3
+
++512M
+n
+p
+4
+
+
+p
+w
+EOF
+
+mkfs.ext2 /dev/vda2
+mkfs.ext4 /dev/vda4
+mkswap /dev/vda3
+swapon /dev/vda3
+mount /dev/vda4 /mnt/gentoo
+
+cd /mnt/gentoo
+
+echo "Copy over a stage3 tar to /mnt/gentoo..."
+echo "Press enter when done"
+read
+
+STAGE3_TAR="$(find . -maxdepth 1 -name 'stage3-amd64*' -print -quit)" ; \
+if test -n "$STAGE3_TAR" ; \
+then \
+    echo "Using tar '$STAGE3_TAR'"
+else \ 
+    echo "Stage 3 tarball not found..." ; \
+    echo "Please scp a tarball over to /mnt/gentoo" ; \
+    exit 1 ; \
+fi
+
+tar xpvf "$STAGE3_TAR" --xattrs-include='*.*' --numeric-owner
+
+cat <<EOF >> etc/portage/make.conf
+MAKEOPTS="-j2"
+VIDEO_CARDS="nvidia"
+GENTOO_MIRRORS="http://mirror.sjc02.svwh.net/gentoo/"
+USE="alsa xft emacs ibus v4l libv4l"
+PORTAGE_BINHOST="http://dacoda-laptop-packages.s3-website-us-west-1.amazonaws.com"
+EOF
+
+mkdir -p /mnt/gentoo/etc/portage/repos.conf
+cp /mnt/gentoo/usr/share/portage/config/repos.conf /mnt/gentoo/etc/portage/repos.conf/gentoo.conf
+cp --dereference /etc/resolv.conf /mnt/gentoo/etc/
+
+mount --types proc /proc /mnt/gentoo/proc
+mount --rbind /sys /mnt/gentoo/sys
+mount --make-rslave /mnt/gentoo/sys
+mount --rbind /dev /mnt/gentoo/dev
+mount --make-rslave /mnt/gentoo/dev
+mount /dev/vda2 /mnt/gentoo/boot
+
+chroot /mnt/gentoo /bin/bash -c 'post_chroot'
+
+umount -l /mnt/gentoo/dev{/shm,/pts,}
+umount -R /mnt/gentoo
+reboot

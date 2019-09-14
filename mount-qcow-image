@@ -1,0 +1,4 @@
+#!/bin/bash
+
+qemu-nbd -c /dev/nbd0 ~/kvm/gentoo-vm
+mount /dev/nbd0p4 /mnt/gentoo-virtual
