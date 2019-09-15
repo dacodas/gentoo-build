@@ -17,7 +17,6 @@
 # TODO: Add option for emerge-webrsync --revert
 # TODO: Make sure that CONFIG_VIRTIO_BLK and CONFIG_VIRTIO_PCI work
 # TODO: Easier tagging of kernel versions, look into maintaining package and overlay
-# TODO: Use overlayfs for any changes to the filesystem after the image is built
 # TODO: grub-mkconfig, select the correct root partitions
 
 # TODO: add keymaps, .fbtermrc for better console
@@ -26,6 +25,34 @@
 
 # TODO: dpi, xmodmap, and redshift, keynav
 # TODO: sudo, add user, `eselect opengl nvidia`
+# TODO: plymouth, laptop lid-closing, hibernation
+# TODO: Simple alerts, battery-low warnings and behavior
+# TODO: encrypted drives
+# TODO: setxkbmap for ibus
+# TODO: containers configuration: crictl
+
+# /etc/grub.d
+# /etc/default/grub
+
+# /etc/conf.d/kubelet
+
+# cri-o: ip-forwarding,
+# mkdir -p /usr/local/libexec/crio/
+# ln -sf /usr/bin/conmon /usr/local/libexec/crio/conmon
+# Install kubelet 1.15.3
+# 
+# /etc/containers/storage.conf
+# [storage]
+# graphroot = "/home/storage/containers"
+# runroot = "/var/run/containers/storage"
+
+# IDEA: Use overlayfs for any changes to the filesystem after the image is built.
+# How would this work? I see some suggestions here:
+#
+# https://unix.stackexchange.com/questions/316018/how-to-use-overlayfs-to-protect-the-root-filesystem?noredirect=1
+# https://unix.stackexchange.com/questions/420646/mount-root-as-overlayfs
+#
+# It looks like making a custom initramfs that mounts the root as an overlay works
 
 # I don't understand why I had to oneshot mesa in order for the deep
 # emerge to work. The next time around, we'll update the same day we
@@ -44,7 +71,7 @@ function post_chroot()
     export PS1="(chroot) ${PS1}"
 
     # Change this to using git
-    emerge-webrsync --revert=20190912
+    emerge-webrsync -k --revert=20190912
 
     eselect profile list
 

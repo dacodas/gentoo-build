@@ -1,0 +1,27 @@
+#!/bin/bash 
+
+find /lib/modules/4.19.66-dagentoo-beta/ -name \*.ko \
+    | xargs -n1 basename \
+    | sed 's/\.ko//g' \
+    | xargs -n1 modprobe
+
+swapoff -a
+echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables
+echo 1 > /proc/sys/net/ipv4/ip_forward
+ip link add cni0 type bridge
+
+# Afterwards...
+function apply() 
+{
+    kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/62e44c867a2846fefb68bd5f178daf4da3095ccb/Documentation/kube-flannel.yml
+
+    kubectl create secret generic container-registry-dacodastrack-com-secret \
+            --from-file=.dockerconfigjson=/home/dacoda/.docker/config.json  \
+            --type=kubernetes.io/dockerconfigjson
+
+    kubectl taint nodes --all node-role.kubernetes.io/master-
+}
+
+# Let's fix the following error: 
+# 
+# E0921 18:33:20.098529       1 proxier.go:1442] Failed to delete stale service IP 10.96.0.10 connections, error: error deleting connection tracking state for UDP service IP: 10.96.0.10, error: conntrack command returned: "conntrack v1.4.4 (conntrack-tools): Operation failed: Operation not supported\n", error message: exit status 1

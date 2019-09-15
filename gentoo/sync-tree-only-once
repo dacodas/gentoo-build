@@ -1,0 +1,64 @@
+I think we can just copy over the portage tree, based on the settings
+in `/etc/portage/repos.conf/gentoo` and in the output below.
+
+ftp://mirrors.tera-byte.com/pub/gentoo/snapshots/
+
+```
+➜  ~ sudo emerge-webrsync
+パスワード: 
+Fetching most recent snapshot ...
+Trying to retrieve 20190914 snapshot from http://mirror.sjc02.svwh.net/gentoo ...
+Fetching file portage-20190914.tar.xz.md5sum ...
+Fetching file portage-20190914.tar.bz2.md5sum ...
+Fetching file portage-20190914.tar.gz.md5sum ...
+20190914 snapshot was not found
+Trying to retrieve 20190913 snapshot from http://mirror.sjc02.svwh.net/gentoo ...
+Fetching file portage-20190913.tar.xz.md5sum ...
+Fetching file portage-20190913.tar.xz.gpgsig ...
+Fetching file portage-20190913.tar.xz ...
+kChecking digest ...
+Getting snapshot timestamp ...
+Syncing local tree ...
+
+Number of files: 163,042 (reg: 135,680, dir: 27,362)
+Number of created files: 111 (reg: 105, dir: 6)
+Number of deleted files: 77 (reg: 77)
+Number of regular files transferred: 28,441
+Total file size: 221.28M bytes
+Total transferred file size: 68.35M bytes
+Literal data: 68.35M bytes
+Matched data: 0 bytes
+File list size: 1.01M
+File list generation time: 0.001 seconds
+File list transfer time: 0.000 seconds
+Total bytes sent: 36.99M
+Total bytes received: 573.47K
+
+sent 36.99M bytes  received 573.47K bytes  3.27M bytes/sec
+total size is 221.28M  speedup is 5.89
+Cleaning up ...
+
+ * IMPORTANT: 12 news items need reading for repository 'gentoo'.
+ * Use eselect news read to view new items.
+```
+
+Might also be helpful to set this file
+```
+➜  kvm git:(master) ✗ sudo emerge-webrsync -k
+パスワード: 
+Fetching most recent snapshot ...
+Trying to retrieve 20190914 snapshot from http://mirror.sjc02.svwh.net/gentoo ...
+Fetching file portage-20190914.tar.xz.md5sum ...
+Fetching file portage-20190914.tar.bz2.md5sum ...
+Fetching file portage-20190914.tar.gz.md5sum ...
+20190914 snapshot was not found
+ * Latest snapshot date: 20190913
+ * 
+ * Approximate snapshot timestamp: 1568421900
+ *        Current local timestamp: 1568421301
+ * 
+ * The current local timestamp is possibly identical to the
+ * timestamp of the latest snapshot. In order to force sync, use
+ * the --revert option or remove the timestamp file located at
+ * '/var/db/repos/gentoo/metadata/timestamp.x'.
+```

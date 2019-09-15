@@ -1,0 +1,6 @@
+fsdev
+rootdev
+
+move_mounts_to_chroot
+
+/usr/share/genkernel/defaults/initrd.d
